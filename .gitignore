@@ -1,0 +1,34 @@
+# secrets
+.env
+.env.local
+.env.*.local
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# local databases
+*.db
+*.sqlite3
+
+# transcripts: keep the labelled samples, ignore any real corpus a user loads
+data/transcripts/*
+!data/transcripts/README.md
+!data/transcripts/sample-*.md
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log

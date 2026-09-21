@@ -1,0 +1,71 @@
+# One-command startup:  docker compose up --build
+#
+# Ollama runs on the HOST, not in a container. On an 8 GB laptop a
+# containerised Ollama competes with Docker's own VM for memory, and the model
+# files land on the Docker disk (usually C:), which is where space is tightest.
+# The api container reaches the host through host.docker.internal.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: lga-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lenny}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lenny}
+      POSTGRES_DB: ${POSTGRES_DB:-lenny}
+    volumes:
+      - lga-pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lenny} -d ${POSTGRES_DB:-lenny}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: lga-api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://lenny:lenny@db:5432/lenny
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      TRANSCRIPTS_DIR: /app/data/transcripts
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    volumes:
+      # Drop new transcripts in ./data/transcripts and POST
+      # /api/knowledge/ingest — no rebuild needed.
+      - ./data/transcripts:/app/data/transcripts:ro
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        # Empty base => the browser calls /api on its own origin and nginx
+        # proxies to the api container. No CORS, no SSE buffering.
+        VITE_API_BASE: ""
+    container_name: lga-web
+    ports:
+      - "${WEB_PORT:-5173}:80"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  lga-pgdata:
