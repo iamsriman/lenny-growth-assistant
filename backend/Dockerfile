@@ -1,5 +1,3 @@
-# Build context is the REPOSITORY ROOT (see docker-compose.yml) so the image
-# can carry both the app and the transcript corpus.
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
